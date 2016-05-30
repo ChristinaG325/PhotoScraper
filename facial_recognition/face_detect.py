@@ -1,6 +1,15 @@
 """
-Code from:
+File: face_detect.py
+-------------------
+Assignment 4: PhotoScraper
+Course: CS 41
+Name: Christina Gilbert
+SUNet: christyg
+
+This code was taken from the following website:
 https://realpython.com/blog/python/face-recognition-with-python/
+
+and converted into a module for use in my project.
 
 """
 import cv2

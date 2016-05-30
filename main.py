@@ -40,7 +40,7 @@ from PIL import Image
 from fb_albums import get_albums
 from facial_recognition import face_detect
 
-PHOTOS_PATH = 'albums2'
+PHOTOS_PATH = 'albums'
 LOST_FACE_FACTOR = 10
 
 def download_photos():
@@ -49,7 +49,7 @@ def download_photos():
 	PHOTOS_PATH
 	"""
 
-	token_file = open('API_KEYS.txt', 'r')
+	token_file = open('access_token', 'r')
 	token = token_file.read()
 	api_url = "https://graph.facebook.com/v2.1/"
 	get_albums.download(token, PHOTOS_PATH)
@@ -179,7 +179,6 @@ def attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces):
 
 	return new_crop if new_crop.score <= best_crop.score else best_crop
 
-#faces as (x, y, w, h)
 def process_bad_proportions(original_image, size, faces):
 	"""Given an image with bad proportions, calculates the best 4x6 crop to minimize photo 
 	area and in particular, face area, lost from the photo
