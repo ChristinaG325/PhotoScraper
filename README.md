@@ -13,15 +13,15 @@ This script uses python 2.7
 
 Third-party packages:
 
-numpy
-Pillow
-opencv
+`numpy`
+`Pillow`
+`opencv`
 
 See requirements.txt for versions
 
 In order to pull photos from Facebook, you'll need a Facebook Access Token go to https://developers.facebook.com/tools-and-support/ and click on Graph API Explorer to get an access token. You'll need to ask for access to photos. Put this string into a file called access_token 
 
-echo "LONGACCESSTOKENFROMAPIEXPLORERGOESHERE" > access_token
+`echo "LONGACCESSTOKENFROMAPIEXPLORERGOESHERE" > access_token`
 
 # Usage
 
