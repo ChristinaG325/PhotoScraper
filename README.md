@@ -1,9 +1,6 @@
 # PhotoScraper
 
-This script pulls a user's posted photos from all photo albums, saves
-them to the filesystem, and crops the photos to be 4x6 in such a way 
-to minimize both the total area cropped from the photo and the area of
-faced cropped from the photo.
+This script pulls a user's posted photos from all photo albums, saves them to the filesystem, and crops the photos to be 4x6 in such a way to minimize both the total area cropped from the photo and the area of faced cropped from the photo.
 
 Square photos are padded with black space to become 4x6 photos.
 
