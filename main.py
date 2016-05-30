@@ -4,8 +4,10 @@ from os import listdir
 from PIL import Image
 import itertools
 import sys
+from collections import namedtuple
 
 PHOTOS_PATH = 'albums2'
+LOST_FACE_FACTOR = 10
 
 def download_photos():
 	token_file = open('API_KEYS.txt', 'r')
@@ -19,7 +21,7 @@ def load_photos():
 		photos = listdir(PHOTOS_PATH + "/" + folder)
 		for photo in photos:
 			process_photo(PHOTOS_PATH + "/" + folder + "/" + photo)
-		break
+			break
 
 def process_photo(filename):
 
@@ -29,7 +31,7 @@ def process_photo(filename):
 		print "Unable to load image {image}".format(image=filename)
 
 	size = original_image.size
-	print size
+	print "Image Size: {sz}".format(sz=size)
 
 	#Case 1: Image is 4x6. Nothing to be done.
 	if size[0] == size[1]*2/3 or size[1] == size[0]*2/3:
@@ -81,7 +83,7 @@ def IS_GOOD(image):
 
 	size = image.size
 	print "SIZE: {sz}".format(sz=size)
-	if size[0] == size[1]*2/3 or size[1] == size[0]*2/3:
+	if size[1]*2/3 - 1 <= size[0] <= size[1]*2/3 + 1 or size[0]*2/3 - 1 <= size[1] <= size[0]*2/3 + 1:
 		print "GOOD SIZE"
 	else:
 		print "##############"
@@ -89,60 +91,114 @@ def IS_GOOD(image):
 		print "##############"
 	print "- - - - - "
 
+def attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces):
+	lost_face_area = original_image_overlap - total_face_overlap(new_box, faces)
+	print "Lost face area scaled: {area}".format(area=lost_face_area)
+	print "Lost image area: {area}".format(area=lost_area)
+	new_crop = Crop(box=new_box, score= ((LOST_FACE_FACTOR * lost_face_area) + lost_area))
+
+	return new_crop if new_crop.score <= best_crop.score else best_crop
+
 #faces as (x, y, w, h)
 def process_bad_proportions(original_image, size, faces):
 
 	width, height = size
-	box=(0, 0, width, height)
-	original_image_overlap = total_face_overlap(box, faces)
+	original_box=(0, 0, width, height)
+	original_image_overlap = total_face_overlap(original_box, faces)
 
 	#(left, upper, right, lower) All four coordinates are measured 
 	#from the top/left corner, and describe the distance from that 
 	#corner to the left edge, top edge, right edge and bottom edge.
 
-	best_box = box
-	best_score = sys.maxint
+	best_crop = Crop(box= original_box, score= sys.maxint)
+
+	boxes = []
 
 	new_height = 2*size[0]/3
 	if(new_height < height):
 		lost_area = width * (height - new_height)
+		boxes.append(Crop(box=(0, 0, width, new_height), score=lost_area))
+		boxes.append(Crop(box=(0, height - new_height, width, height), score=lost_area))
+		boxes.append(Crop(box=(0, (height - new_height)/2, width, height - (height - new_height)/2), score=lost_area))
 
-		#ATTEMPT CROP 1: fix width, crop height to 2/3width - crop from bottom
-		box=(0, 0, width, new_height)
-		lost_face_area = original_image_overlap - total_face_overlap(box, faces)
-		print "LOST FACE AREA: {area}".format(area=lost_face_area)
+	new_height = 3*size[0]/2
+	if(new_height < height):
+		lost_area = width * (height - new_height)
+		boxes.append(Crop(box=(0, 0, width, new_height), score=lost_area))
+		boxes.append(Crop(box=(0, height - new_height, width, height), score=lost_area))
+		boxes.append(Crop(box=(0, (height - new_height)/2, width, height - (height - new_height)/2), score=lost_area))
 
-		#ATTEMPT CROP 2: fix width, crop height to 2/3width - crop from top
-		box=(0, height - new_height, width, height)
-
-		#ATTEMPT CROP 3: fix width, crop height to 2/3width - crop halfway from top & bottom
-		box=(0, (height - new_height)/2, width, height - (height - new_height)/2)
-
-	else:
-		print "BAD NEW HEIGHT~~~~"
-	
-
-	new_width = 2*size[1]/3                                             
+	new_width = 2*size[1]/3  
 	if(new_width < width):
-		cropped_pixels = height * (width - new_width)
+		lost_area = height * (width - new_width)
+		boxes.append(Crop(box=(0, 0, new_width, height), score=lost_area))
+	 	boxes.append(Crop(box=(width - new_width, 0, width, height), score=lost_area))
+	 	boxes.append(Crop(box=((width - new_width)/2, 0,  width - (width - new_width)/2, height), score=lost_area))
 
-		#ATTEMPT CROP 4: fix height, crop width to 2/height - crop from left
-		newImage = original_image.crop(box=(0, 0, new_width, height))
-		IS_GOOD(newImage)
+	new_width = 3*size[1]/2
+	if(new_width < width):
+		lost_area = height * (width - new_width)
+		boxes.append(Crop(box=(0, 0, new_width, height), score=lost_area))
+	 	boxes.append(Crop(box=(width - new_width, 0, width, height), score=lost_area))
+	 	boxes.append(Crop(box=((width - new_width)/2, 0,  width - (width - new_width)/2, height), score=lost_area))
 
-		#ATTEMPT CROP 5: fix height, crop width to 2/height - crop from right
-		newImage = original_image.crop(box=(width - new_width, 0, width, height))
-		IS_GOOD(newImage)
+	for new_crop in boxes:
+		best_crop = attempt_crop(new_crop.box, original_image_overlap, new_crop.score, best_crop, faces)
 
-		#ATTEMPT CROP 6: fix height, crop width to 2/height - crop halfway from left & right
-		newImage = original_image.crop(box=((width - new_width)/2, 0,  width - (width - new_width)/2, height))
-		IS_GOOD(newImage)
-	else:
-		print "BAD NEW WIDTH~~~~"
+
+	# new_height = 3*size[0]/2
+	# #new_height = 2*size[0]/3
+	# if(new_height < height):
+	# 	lost_area = width * (height - new_height)
+
+	# 	print "ATTEMPT CROP 1: fix width, crop height to 2/3width - crop from bottom"
+	# 	new_box = (0, 0, width, new_height)
+	# 	best_crop = attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces)
+	# 	new_image = original_image.crop(box=new_box)
+	# 	IS_GOOD(new_image)
+
+	# 	print "ATTEMPT CROP 2: fix width, crop height to 2/3width - crop from top"
+	# 	new_box=(0, height - new_height, width, height)
+	# 	best_crop = attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces)
+	# 	new_image = original_image.crop(box=new_box)
+	# 	IS_GOOD(new_image)
+
+	# 	print "ATTEMPT CROP 3: fix width, crop height to 2/3width - crop halfway from top & bottom"
+	# 	new_box=(0, (height - new_height)/2, width, height - (height - new_height)/2)
+	# 	best_crop = attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces)
+	# 	new_image = original_image.crop(box=new_box)
+	# 	IS_GOOD(new_image)
+
+
+
+
+	# new_width = 2*size[1]/3                                             
+	# if(new_width < width):
+	# 	lost_area = height * (width - new_width)
+
+	# 	print "ATTEMPT CROP 4: fix height, crop width to 2/height - crop from left"
+	# 	new_box=(0, 0, new_width, height)
+	# 	best_crop = attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces)
+
+
+	# 	print "ATTEMPT CROP 5: fix height, crop width to 2/height - crop from right"
+	# 	new_box=(width - new_width, 0, width, height)
+	# 	best_crop = attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces)
+
+	# 	print "ATTEMPT CROP 6: fix height, crop width to 2/height - crop halfway from left & right"
+	# 	new_box=((width - new_width)/2, 0,  width - (width - new_width)/2, height)
+	# 	best_crop = attempt_crop(new_box, original_image_overlap, lost_area, best_crop, faces)
+
+
+	new_image = original_image.crop(box=best_crop.box)
+	new_image.show()
+	IS_GOOD(new_image)
+
 
 
 
 if __name__ == '__main__':
+	Crop = namedtuple('Crop', ['box', 'score'])
 	download_photos()
 	load_photos()
 
